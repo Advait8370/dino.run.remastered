@@ -1,145 +1,143 @@
 const canvas = document.getElementById('c');
 const ctx = canvas.getContext('2d');
+
+// Game Config
 const W = 800, H = 200;
 canvas.width = W; canvas.height = H;
 
-// Game State
-let state = 'menu'; // menu, playing, gameOver
-let mode = 'single'; // single, localMP
-let score = 0, hiScore = 0, speed = 5, frame = 0;
-let obstacles = [], clouds = [], groundPebbles = [];
-let soundEnabled = true, fxEnabled = true;
+const state = {
+    mode: 'menu',
+    score: 0,
+    hiScore: 0,
+    speed: 6,
+    frame: 0,
+    sound: true,
+    entities: []
+};
 
-const dino1 = { x: 50, y: 155, w: 40, h: 50, vy: 0, onGround: true, color: '#535353', dead: false, key: 'ArrowUp' };
-const dino2 = { x: 100, y: 155, w: 40, h: 50, vy: 0, onGround: true, color: '#e05c2a', dead: false, key: 'KeyW' };
+// Real Pixel Sprite Maps (v26.2 Upgrade)
+const SPRITES = {
+    dino: [[0,0,0,1,1,1,1,0],[0,0,0,1,1,0,1,1],[0,0,0,1,1,1,1,1],[1,1,1,1,1,1,0,0],[1,1,1,1,1,1,1,0],[0,0,1,1,1,1,1,0],[0,0,1,0,0,1,0,0]],
+    cactus: [[0,1,1,0],[1,1,1,1],[0,1,1,0],[0,1,1,0]],
+    bird: [[0,1,1,0,0],[1,1,1,1,1],[0,0,1,0,0]]
+};
 
-/* --- Menu Controls --- */
-function showScreen(screen) {
-    document.querySelectorAll('.overlay').forEach(el => el.classList.add('hidden'));
-    if(screen === 'main') document.getElementById('menu-overlay').classList.remove('hidden');
-    if(screen === 'multiplayer') document.getElementById('multiplayer-menu').classList.remove('hidden');
-    if(screen === 'settings') document.getElementById('settings-menu').classList.remove('hidden');
-    if(screen === 'updates') document.getElementById('updates-menu').classList.remove('hidden');
-    if(screen === 'singleplayer') startGame('single');
+class Entity {
+    constructor(x, y, w, h, type, color) {
+        Object.assign(this, {x, y, w, h, type, color, vy: 0, ground: true, duck: false});
+    }
+
+    draw() {
+        ctx.fillStyle = this.color;
+        const map = SPRITES[this.type] || [[1]];
+        const pSize = this.w / map[0].length;
+        
+        map.forEach((row, rIdx) => {
+            row.forEach((pixel, cIdx) => {
+                if (pixel) ctx.fillRect(this.x + (cIdx * pSize), this.y + (rIdx * pSize), pSize, pSize);
+            });
+        });
+    }
 }
 
-function toggleSound() {
-    soundEnabled = !soundEnabled;
-    document.getElementById('toggle-sound').innerText = soundEnabled ? 'ON' : 'OFF';
-}
+let player1, player2;
 
-function toggleFX() {
-    fxEnabled = !fxEnabled;
-    document.getElementById('toggle-fx').innerText = fxEnabled ? 'ON' : 'OFF';
-}
+const ui = {
+    show: (name) => {
+        document.querySelectorAll('.overlay').forEach(el => el.classList.add('hidden'));
+        document.getElementById(`menu-${name}`).classList.remove('hidden');
+    }
+};
 
-/* --- Core Game Logic --- */
-function startGame(m) {
-    state = 'playing';
-    mode = m;
-    score = 0;
-    speed = 5;
-    obstacles = [];
-    dino1.dead = false; dino1.y = 155;
-    dino2.dead = false; dino2.y = 155;
-    
-    document.querySelectorAll('.overlay').forEach(el => el.classList.add('hidden'));
-    document.getElementById('score-board').classList.remove('hidden');
-}
+const game = {
+    start: (mode) => {
+        state.mode = mode;
+        state.score = 0;
+        state.speed = 6;
+        state.entities = [];
+        player1 = new Entity(50, 150, 40, 44, 'dino', '#535353');
+        if (mode === 'local') player2 = new Entity(100, 150, 40, 44, 'dino', '#e05c2a');
+        
+        document.querySelectorAll('.overlay').forEach(el => el.classList.add('hidden'));
+        document.getElementById('game-stats').classList.remove('hidden');
+    },
 
-function returnToMenu() {
-    state = 'menu';
-    showScreen('main');
-    document.getElementById('score-board').classList.add('hidden');
-}
+    restart: () => game.start(state.mode),
 
-function restartCurrentMode() {
-    startGame(mode);
-}
+    toggleSound: () => {
+        state.sound = !state.sound;
+        document.getElementById('toggle-sound').innerText = `SOUND: ${state.sound ? 'ON' : 'OFF'}`;
+    }
+};
 
-// Input handling
+// Input Handling (PC: Space/Arrows, Mobile: Touch)
 const keys = {};
-window.addEventListener('keydown', e => {
+window.onkeydown = (e) => {
     keys[e.code] = true;
-    if (state === 'playing') {
-        if (e.code === dino1.key && dino1.onGround) { dino1.vy = -12; dino1.onGround = false; }
-        if (mode === 'localMP' && e.code === dino2.key && dino2.onGround) { dino2.vy = -12; dino2.onGround = false; }
-    }
-});
-window.addEventListener('keyup', e => keys[e.code] = false);
+    if (e.code === 'Space' || e.code === 'ArrowUp') jump(player1);
+    if (e.code === 'KeyW') jump(player2);
+};
+window.onkeyup = (e) => keys[e.code] = false;
+window.ontouchstart = () => { if(state.mode !== 'menu') jump(player1); };
 
-// Physics & Update
+function jump(p) {
+    if (p && p.ground) { p.vy = -12; p.ground = false; }
+}
+
 function update() {
-    if (state !== 'playing') return;
+    if (state.mode === 'menu' || state.mode === 'over') return;
 
-    frame++;
-    score += 0.1;
-    speed = Math.min(15, 5 + (score / 200));
+    state.frame++;
+    state.score += 0.1;
+    state.speed = Math.min(14, 6 + (state.score / 500));
 
-    updateDino(dino1);
-    if (mode === 'localMP') updateDino(dino2);
-
-    // Obstacles
-    if (frame % 100 === 0) {
-        obstacles.push({ x: W, y: 155, w: 20, h: 40 });
-    }
-
-    obstacles.forEach(o => {
-        o.x -= speed;
-        if (checkCollision(dino1, o)) { dino1.dead = true; endGame(); }
-        if (mode === 'localMP' && checkCollision(dino2, o)) { dino2.dead = true; endGame(); }
+    [player1, player2].forEach(p => {
+        if (!p) return;
+        // Gravity & Ducking (ArrowDown / S)
+        p.duck = (p === player1 && keys['ArrowDown']) || (p === player2 && keys['KeyS']);
+        p.vy += 0.6;
+        p.y += p.vy;
+        if (p.y > 150) { p.y = 150; p.ground = true; }
     });
 
-    document.getElementById('score-val').innerText = Math.floor(score).toString().padStart(5, '0');
-}
-
-function updateDino(d) {
-    if (!d.onGround) {
-        d.vy += 0.6;
-        d.y += d.vy;
-        if (d.y >= 155) { d.y = 155; d.onGround = true; }
+    // Spawn Obstacles
+    if (state.frame % 80 === 0) {
+        state.entities.push(new Entity(W, 160, 25, 35, 'cactus', '#535353'));
     }
+
+    state.entities.forEach((ent, i) => {
+        ent.x -= state.speed;
+        // Simple Collision
+        if (player1 && checkHit(player1, ent)) gameOver("PLAYER 2 WINS!");
+        if (player2 && checkHit(player2, ent)) gameOver("PLAYER 1 WINS!");
+    });
+
+    document.getElementById('score-val').innerText = Math.floor(state.score).toString().padStart(5, '0');
 }
 
-function checkCollision(d, o) {
-    return d.x < o.x + o.w && d.x + d.w > o.x && d.y < o.y + o.h && d.y + d.h > o.y;
+function checkHit(p, e) {
+    return p.x < e.x + e.w && p.x + p.w > e.x && p.y < e.y + e.h && p.y + p.h > e.y;
 }
 
-function endGame() {
-    state = 'gameOver';
+function gameOver(msg) {
+    state.mode = 'over';
     document.getElementById('game-over').classList.remove('hidden');
-    if (mode === 'localMP') {
-        document.getElementById('winner-msg').innerText = dino1.dead ? "PLAYER 2 WINS!" : "PLAYER 1 WINS!";
-    } else {
-        document.getElementById('winner-msg').innerText = "GAME OVER";
-    }
+    document.getElementById('winner-text').innerText = state.mode === 'local' ? msg : "GAME OVER";
 }
 
-function startLocalMP() { startGame('localMP'); }
-
-// Simple Render Loop
-function draw() {
+function loop() {
     ctx.clearRect(0, 0, W, H);
-    
-    // Ground line
-    ctx.strokeStyle = '#535353';
-    ctx.beginPath(); ctx.moveTo(0, 195); ctx.lineTo(W, 195); ctx.stroke();
+    // Ground
+    ctx.fillStyle = '#535353';
+    ctx.fillRect(0, 190, W, 2);
 
-    // Dinos
-    ctx.fillStyle = dino1.color;
-    ctx.fillRect(dino1.x, dino1.y, dino1.w, dino1.h);
-    
-    if (mode === 'localMP') {
-        ctx.fillStyle = dino2.color;
-        ctx.fillRect(dino2.x, dino2.y, dino2.w, dino2.h);
+    if (state.mode !== 'menu') {
+        update();
+        if(player1) player1.draw();
+        if(player2) player2.draw();
+        state.entities.forEach(e => e.draw());
     }
-
-    // Obstacles
-    ctx.fillStyle = '#b00';
-    obstacles.forEach(o => ctx.fillRect(o.x, o.y, o.w, o.h));
-
-    update();
-    requestAnimationFrame(draw);
+    requestAnimationFrame(loop);
 }
 
-draw();
+loop();
