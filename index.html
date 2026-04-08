@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-    <title>Dino Run Remastered</title>
+    <title>Dino Run Remastered v26.3</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -24,8 +24,22 @@
             <h2>MULTIPLAYER</h2>
             <div class="btn-group">
                 <button onclick="game.start('local')">LOCAL (P1: ↑, P2: W)</button>
-                <button class="disabled">ONLINE (COMING SOON)</button>
+                <button onclick="ui.show('online-lobby')">ONLINE MULTIPLAYER</button>
                 <button class="back" onclick="ui.show('main')">BACK</button>
+            </div>
+        </div>
+
+        <div id="menu-online-lobby" class="overlay hidden">
+            <h2>ONLINE LOBBY</h2>
+            <div class="btn-group">
+                <input type="text" id="room-input" placeholder="ENTER ROOM ID" style="padding: 10px; font-family: 'Press Start 2P'; font-size: 8px;">
+                <button onclick="online.join()">JOIN ROOM</button>
+                <hr>
+                <label style="font-size: 8px; color: #535353;">MAX PLAYERS: 
+                    <input type="number" id="max-p" value="5" min="2" max="10" style="width: 50px;">
+                </label>
+                <button onclick="online.create()">CREATE ROOM</button>
+                <button class="back" onclick="ui.show('multi')">BACK</button>
             </div>
         </div>
 
@@ -33,18 +47,17 @@
             <h2>SETTINGS</h2>
             <div class="btn-group">
                 <button id="toggle-sound" onclick="game.toggleSound()">SOUND: ON</button>
-                <button id="toggle-fx" onclick="game.toggleFX()">EFFECTS: ON</button>
                 <p class="credits">CREDITS: Advait8370</p>
                 <button class="back" onclick="ui.show('main')">BACK</button>
             </div>
         </div>
 
         <div id="menu-updates" class="overlay hidden">
-            <h2>LOG v26.2</h2>
+            <h2>LOGS</h2>
             <div class="scroll-box">
-                <p><span>v26.2:</span> Real Pixel Sprites, Fixed Scaling, New Controls.</p>
-                <p><span>v26.1:</span> Bug fixes for high-score saving.</p>
-                <p><span>v26.0:</span> Menu System & Local Multiplayer.</p>
+                <p><span>v26.3:</span> Online Multiplayer & Lobby System.</p>
+                <p><span>v26.2:</span> Real Pixel Sprites & Scaling Fix.</p>
+                <p><span>v26.0:</span> Menu System & Local MP.</p>
             </div>
             <button class="back" onclick="ui.show('main')">BACK</button>
         </div>
@@ -65,6 +78,7 @@
     <canvas id="c"></canvas>
 </div>
 
+<script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
 <script src="script.js"></script>
 </body>
 </html>
