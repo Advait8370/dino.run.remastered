@@ -29,11 +29,7 @@ body {
     image-rendering: pixelated;
 }
 
-canvas {
-    width: 100%;
-    height: 100%;
-    display: block;
-}
+canvas { width: 100%; height: 100%; display: block; }
 
 .overlay {
     position: absolute;
@@ -48,10 +44,10 @@ canvas {
 
 .hidden { display: none !important; }
 
-h1 { font-size: 18px; margin-bottom: 20px; color: var(--dino); }
-h2 { font-size: 14px; margin-bottom: 15px; color: var(--accent); }
+h1 { font-size: 16px; margin-bottom: 20px; color: var(--dino); text-align: center; }
+h2 { font-size: 12px; margin-bottom: 15px; color: var(--accent); }
 
-.btn-group { display: flex; flex-direction: column; gap: 8px; width: 220px; }
+.btn-group { display: flex; flex-direction: column; gap: 8px; width: 240px; }
 
 button {
     background: var(--dino);
@@ -61,13 +57,11 @@ button {
     font-family: 'Press Start 2P';
     font-size: 8px;
     cursor: pointer;
-    transition: transform 0.1s;
 }
 
-button:active { transform: scale(0.95); }
+button:active { transform: scale(0.98); }
 button:hover { background: var(--accent); }
 button.back { background: #888; margin-top: 10px; }
-button.disabled { opacity: 0.5; cursor: not-allowed; }
 
 #game-stats {
     position: absolute;
@@ -85,10 +79,11 @@ button.disabled { opacity: 0.5; cursor: not-allowed; }
     overflow-y: auto;
     text-align: left;
     margin-bottom: 10px;
+    width: 80%;
 }
 
 @media (max-width: 600px) {
     #game-container { height: 180px; border-width: 2px; }
-    h1 { font-size: 14px; }
+    h1 { font-size: 12px; }
     button { padding: 12px; font-size: 7px; }
 }
