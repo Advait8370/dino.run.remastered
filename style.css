@@ -6,7 +6,7 @@
     --accent: #e05c2a;
 }
 
-/* Base resets to prevent accidental scrolling or zooming */
+/* 1. RESET & MOBILE OPTIMIZATION */
 * { 
     box-sizing: border-box; 
     margin: 0; 
@@ -25,57 +25,68 @@ body {
     width: 100vw;
     font-family: 'Press Start 2P', cursive;
     overflow: hidden;
+    margin: 0;
 }
 
+/* 2. GAME CONTAINER */
 #game-container {
     position: relative;
     width: 95vw;
     max-width: 800px;
-    /* Maintains the 4:1 ratio regardless of device orientation */
+    /* Maintains the shape of the game world */
     aspect-ratio: 4 / 1; 
     background: var(--bg);
     border: 4px solid var(--dino);
     image-rendering: pixelated;
+    overflow: hidden;
 }
 
-/* Mobile PORTRAIT Optimization */
-@media (orientation: portrait) {
-    #game-container {
-        width: 98vw;
-        border-width: 2px;
-    }
-    h1 { font-size: 10px; }
-    .btn-group { width: 180px; }
-    button { padding: 15px; font-size: 7px; } 
+canvas {
+    width: 100%;
+    height: 100%;
+    display: block;
 }
 
-/* Mobile LANDSCAPE Optimization */
-@media (orientation: landscape) and (max-height: 500px) {
-    #game-container {
-        max-height: 60vh; /* Prevents the game from being cut off by browser bars */
-    }
-}
-
-canvas { width: 100%; height: 100%; display: block; }
-
+/* 3. MENU OVERLAYS */
 .overlay {
     position: absolute;
-    inset: 0;
+    /* This forces the menu background to fill the container */
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
     background: var(--bg);
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
     z-index: 20;
-    padding: 10px;
+    padding: 15px;
 }
 
 .hidden { display: none !important; }
 
-h1 { font-size: clamp(12px, 4vw, 18px); margin-bottom: 20px; color: var(--dino); text-align: center; }
-h2 { font-size: 12px; margin-bottom: 15px; color: var(--accent); }
+/* 4. TYPOGRAPHY & BUTTONS */
+h1 { 
+    font-size: clamp(10px, 4vw, 16px); 
+    margin-bottom: 20px; 
+    color: var(--dino); 
+    text-align: center; 
+}
 
-.btn-group { display: flex; flex-direction: column; gap: 8px; width: 240px; max-width: 95%; }
+h2 { 
+    font-size: 10px; 
+    margin-bottom: 15px; 
+    color: var(--accent); 
+}
+
+.btn-group { 
+    display: flex; 
+    flex-direction: column; 
+    gap: 8px; 
+    width: 240px; 
+    max-width: 90%; 
+}
 
 button {
     background: var(--dino);
@@ -85,15 +96,54 @@ button {
     font-family: 'Press Start 2P';
     font-size: 8px;
     cursor: pointer;
+    width: 100%;
 }
 
-button:active { transform: scale(0.95); }
+button:active { transform: scale(0.96); }
+button:hover { background: var(--accent); }
+button.back { background: #888; margin-top: 5px; }
+button.disabled { opacity: 0.5; cursor: not-allowed; }
 
+/* 5. HUD ELEMENTS */
 #game-stats {
     position: absolute;
-    top: 5px;
-    right: 10px;
+    top: 8px;
+    right: 12px;
     font-size: 8px;
     color: var(--dino);
     z-index: 10;
+}
+
+.scroll-box {
+    font-size: 7px;
+    line-height: 1.6;
+    max-height: 60px;
+    overflow-y: auto;
+    text-align: left;
+    margin-bottom: 10px;
+    width: 100%;
+}
+
+/* 6. RESPONSIVE ORIENTATION FIXES */
+
+/* Vertical Mobile (Portrait) */
+@media (orientation: portrait) {
+    #game-container {
+        width: 98vw;
+        /* Make the box taller so menus aren't squashed */
+        aspect-ratio: 2 / 1; 
+        border-width: 3px;
+    }
+    h1 { margin-bottom: 15px; }
+    button { padding: 14px; font-size: 8px; }
+    .btn-group { width: 100%; }
+}
+
+/* Short Mobile (Landscape) */
+@media (orientation: landscape) and (max-height: 450px) {
+    #game-container {
+        max-height: 70vh;
+    }
+    h1 { margin-bottom: 10px; font-size: 12px; }
+    button { padding: 8px; }
 }
