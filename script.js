@@ -2,7 +2,7 @@ const canvas = document.getElementById('c');
 const ctx = canvas.getContext('2d');
 
 // Internal resolution stays fixed for physics consistency
-const W = 800, H = 200;
+const W = 800, H = 500;
 canvas.width = W; canvas.height = H;
 
 // Multiplayer Connection
