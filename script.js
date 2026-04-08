@@ -1,11 +1,11 @@
 const canvas = document.getElementById('c');
 const ctx = canvas.getContext('2d');
 
-// Game Config
+// Internal resolution stays fixed for physics consistency
 const W = 800, H = 200;
 canvas.width = W; canvas.height = H;
 
-// 1. CONNECT TO YOUR RENDER SERVER
+// Multiplayer Connection
 const socket = io("https://dino-run-remastered-server.onrender.com");
 
 const state = {
@@ -14,27 +14,22 @@ const state = {
     hiScore: 0,
     speed: 6,
     frame: 0,
-    sound: true,
     entities: []
 };
 
-// Real Pixel Sprite Maps
 const SPRITES = {
     dino: [[0,0,0,1,1,1,1,0],[0,0,0,1,1,0,1,1],[0,0,0,1,1,1,1,1],[1,1,1,1,1,1,0,0],[1,1,1,1,1,1,1,0],[0,0,1,1,1,1,1,0],[0,0,1,0,0,1,0,0]],
-    cactus: [[0,1,1,0],[1,1,1,1],[0,1,1,0],[0,1,1,0]],
-    bird: [[0,1,1,0,0],[1,1,1,1,1],[0,0,1,0,0]]
+    cactus: [[0,1,1,0],[1,1,1,1],[0,1,1,0],[0,1,1,0]]
 };
 
 class Entity {
     constructor(x, y, w, h, type, color) {
         Object.assign(this, {x, y, w, h, type, color, vy: 0, ground: true, duck: false});
     }
-
     draw() {
         ctx.fillStyle = this.color;
         const map = SPRITES[this.type] || [[1]];
         const pSize = this.w / map[0].length;
-        
         map.forEach((row, rIdx) => {
             row.forEach((pixel, cIdx) => {
                 if (pixel) ctx.fillRect(this.x + (cIdx * pSize), this.y + (rIdx * pSize), pSize, pSize);
@@ -44,33 +39,28 @@ class Entity {
 }
 
 let player1, player2;
-
-// 2. MULTIPLAYER LOGIC
 const online = {
     roomId: null,
-    remotePlayers: {}, // Stores other players in the room
-
+    remotePlayers: {},
     create: () => {
         const max = document.getElementById('max-p').value;
         socket.emit('create-room', { max: parseInt(max) });
     },
-
     join: () => {
         const id = document.getElementById('room-input').value;
         if(id) socket.emit('join-room', id);
     }
 };
 
-// Socket Event Listeners
+// Networking Listeners
 socket.on('joined', (data) => {
     online.roomId = data.roomId;
     game.start('online');
-    alert("Joined Room: " + data.roomId);
+    alert("JOINED ROOM: " + data.roomId);
 });
 
 socket.on('player-moved', (data) => {
     if(!online.remotePlayers[data.id]) {
-        // Create a gray dino for other players
         online.remotePlayers[data.id] = new Entity(data.x, data.y, 40, 44, 'dino', '#aaaaaa');
     }
     online.remotePlayers[data.id].x = data.x;
@@ -94,70 +84,61 @@ const game = {
         state.entities = [];
         player1 = new Entity(50, 150, 40, 44, 'dino', '#535353');
         if (mode === 'local') player2 = new Entity(100, 150, 40, 44, 'dino', '#e05c2a');
-        
         document.querySelectorAll('.overlay').forEach(el => el.classList.add('hidden'));
         document.getElementById('game-stats').classList.remove('hidden');
     },
-
-    restart: () => game.start(state.mode),
-
-    toggleSound: () => {
-        state.sound = !state.sound;
-        document.getElementById('toggle-sound').innerText = `SOUND: ${state.sound ? 'ON' : 'OFF'}`;
-    }
+    restart: () => game.start(state.mode)
 };
 
+// Universal Controls
 const keys = {};
 window.onkeydown = (e) => {
     keys[e.code] = true;
-    if (e.code === 'Space' || e.code === 'ArrowUp') jump(player1);
-    if (e.code === 'KeyW') jump(player2);
+    if ((e.code === 'Space' || e.code === 'ArrowUp') && player1) jump(player1);
+    if (e.code === 'KeyW' && player2) jump(player2);
 };
 window.onkeyup = (e) => keys[e.code] = false;
-window.ontouchstart = () => { if(state.mode !== 'menu') jump(player1); };
 
-function jump(p) {
-    if (p && p.ground) { p.vy = -12; p.ground = false; }
-}
+// Handle Touch Jumps
+window.addEventListener('touchstart', (e) => {
+    if(state.mode !== 'menu' && state.mode !== 'over') {
+        if(e.target.tagName !== 'BUTTON' && e.target.tagName !== 'INPUT') {
+            jump(player1);
+        }
+    }
+}, { passive: false });
+
+function jump(p) { if (p && p.ground) { p.vy = -12; p.ground = false; } }
 
 function update() {
     if (state.mode === 'menu' || state.mode === 'over') return;
-
     state.frame++;
     state.score += 0.1;
     state.speed = Math.min(14, 6 + (state.score / 500));
 
-    // Update Local Player
     if(player1) {
         player1.duck = keys['ArrowDown'] || keys['KeyS'];
         player1.vy += 0.6;
         player1.y += player1.vy;
         if (player1.y > 150) { player1.y = 150; player1.ground = true; }
         
-        // Send data to server if online
+        // Sync to server
         if(state.mode === 'online' && online.roomId) {
-            socket.emit('sync', {
-                roomId: online.roomId,
-                x: player1.x,
-                y: player1.y,
-                duck: player1.duck
-            });
+            socket.emit('sync', { roomId: online.roomId, x: player1.x, y: player1.y, duck: player1.duck });
         }
     }
 
-    // Update Player 2 (Local Multiplayer Only)
     if(player2) {
         player2.vy += 0.6;
         player2.y += player2.vy;
         if (player2.y > 150) { player2.y = 150; player2.ground = true; }
     }
 
-    // Spawn Obstacles (Only generated by your local game)
     if (state.frame % 80 === 0) {
         state.entities.push(new Entity(W, 160, 25, 35, 'cactus', '#535353'));
     }
 
-    state.entities.forEach((ent) => {
+    state.entities.forEach(ent => {
         ent.x -= state.speed;
         if (player1 && checkHit(player1, ent)) gameOver(state.mode === 'local' ? "PLAYER 2 WINS!" : "GAME OVER");
     });
@@ -166,11 +147,7 @@ function update() {
 }
 
 function checkHit(p, e) {
-    const pad = 5;
-    return p.x + pad < e.x + e.w - pad && 
-           p.x + p.w - pad > e.x + pad && 
-           p.y + pad < e.y + e.h - pad && 
-           p.y + p.h - pad > e.y + pad;
+    return p.x < e.x + e.w && p.x + p.w > e.x && p.y < e.y + e.h && p.y + p.h > e.y;
 }
 
 function gameOver(msg) {
@@ -179,22 +156,23 @@ function gameOver(msg) {
     document.getElementById('winner-text').innerText = msg;
 }
 
+// Orientation resize listener
+window.addEventListener('resize', () => {
+    canvas.width = 800;
+    canvas.height = 200;
+});
+
 function loop() {
     ctx.clearRect(0, 0, W, H);
     ctx.fillStyle = '#535353';
-    ctx.fillRect(0, 190, W, 2); // Ground line
-
+    ctx.fillRect(0, 190, W, 2);
     if (state.mode !== 'menu') {
         update();
         if(player1) player1.draw();
         if(player2) player2.draw();
-        
-        // Draw Online Players
         Object.values(online.remotePlayers).forEach(p => p.draw());
-        
         state.entities.forEach(e => e.draw());
     }
     requestAnimationFrame(loop);
 }
-
 loop();
