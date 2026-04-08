@@ -1,11 +1,11 @@
 const canvas = document.getElementById('c');
 const ctx = canvas.getContext('2d');
 
-// Internal resolution stays fixed for physics consistency
-const W = 800, H = 500;
+// Internal resolution stays 800x200 for physics consistency
+const W = 800, H = 200;
 canvas.width = W; canvas.height = H;
 
-// Multiplayer Connection
+// Socket connection to your Render server
 const socket = io("https://dino-run-remastered-server.onrender.com");
 
 const state = {
@@ -52,11 +52,11 @@ const online = {
     }
 };
 
-// Networking Listeners
+// Multiplayer Sync
 socket.on('joined', (data) => {
     online.roomId = data.roomId;
     game.start('online');
-    alert("JOINED ROOM: " + data.roomId);
+    alert("ROOM ID: " + data.roomId);
 });
 
 socket.on('player-moved', (data) => {
@@ -71,8 +71,7 @@ socket.on('player-moved', (data) => {
 const ui = {
     show: (name) => {
         document.querySelectorAll('.overlay').forEach(el => el.classList.add('hidden'));
-        const target = document.getElementById(`menu-${name}`);
-        if(target) target.classList.remove('hidden');
+        document.getElementById(`menu-${name}`).classList.remove('hidden');
     }
 };
 
@@ -90,7 +89,7 @@ const game = {
     restart: () => game.start(state.mode)
 };
 
-// Universal Controls
+// Controls
 const keys = {};
 window.onkeydown = (e) => {
     keys[e.code] = true;
@@ -99,9 +98,10 @@ window.onkeydown = (e) => {
 };
 window.onkeyup = (e) => keys[e.code] = false;
 
-// Handle Touch Jumps
+// Mobile Touch Jump
 window.addEventListener('touchstart', (e) => {
     if(state.mode !== 'menu' && state.mode !== 'over') {
+        // Prevent jumping if a menu button or input is tapped
         if(e.target.tagName !== 'BUTTON' && e.target.tagName !== 'INPUT') {
             jump(player1);
         }
@@ -122,7 +122,6 @@ function update() {
         player1.y += player1.vy;
         if (player1.y > 150) { player1.y = 150; player1.ground = true; }
         
-        // Sync to server
         if(state.mode === 'online' && online.roomId) {
             socket.emit('sync', { roomId: online.roomId, x: player1.x, y: player1.y, duck: player1.duck });
         }
@@ -156,7 +155,7 @@ function gameOver(msg) {
     document.getElementById('winner-text').innerText = msg;
 }
 
-// Orientation resize listener
+// Orientation Change Fix
 window.addEventListener('resize', () => {
     canvas.width = 800;
     canvas.height = 200;
