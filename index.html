@@ -11,7 +11,7 @@
 
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-    <title>Dino Run Remastered 🦕</title>
+    <title>Dino Run Remastered v26.5 🦕</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -20,12 +20,19 @@
     <div id="ui-layer">
         <div id="menu-main" class="overlay">
             <h1>🦕 DINO RUN REMASTERED</h1>
+            <input type="text" id="nick-input" placeholder="ENTER NICKNAME" maxlength="10">
             <div class="btn-group">
                 <button onclick="game.start('single')">SINGLEPLAYER</button>
                 <button onclick="ui.show('multi')">MULTIPLAYER</button>
+                <button onclick="ui.show('leaderboard')">GLOBAL SCORES</button>
                 <button onclick="ui.show('settings')">SETTINGS</button>
-                <button onclick="ui.show('updates')">UPDATES</button>
             </div>
+        </div>
+
+        <div id="menu-leaderboard" class="overlay hidden">
+            <h2>TOP 10 WORLDWIDE</h2>
+            <div id="leaderboard-list" class="scroll-box">Loading...</div>
+            <button class="back" onclick="ui.show('main')">BACK</button>
         </div>
 
         <div id="menu-multi" class="overlay hidden">
@@ -40,12 +47,10 @@
         <div id="menu-online-lobby" class="overlay hidden">
             <h2>ONLINE LOBBY</h2>
             <div class="btn-group">
-                <input type="text" id="room-input" placeholder="ENTER ROOM ID" style="padding: 10px; font-family: 'Press Start 2P'; font-size: 8px;">
+                <input type="text" id="room-input" placeholder="ENTER ROOM ID">
                 <button onclick="online.join()">JOIN ROOM</button>
                 <hr>
-                <label style="font-size: 8px; color: #535353;">MAX: 
-                    <input type="number" id="max-p" value="5" min="2" max="10" style="width: 50px;">
-                </label>
+                <label>MAX PLAYERS: <input type="number" id="max-p" value="5" min="2" max="10"></label>
                 <button onclick="online.create()">CREATE ROOM</button>
                 <button class="back" onclick="ui.show('multi')">BACK</button>
             </div>
@@ -54,22 +59,14 @@
         <div id="menu-settings" class="overlay hidden">
             <h2>SETTINGS</h2>
             <div class="btn-group">
-                <button id="toggle-sound">SOUND: ON</button>
-                <p class="credits" style="font-size: 7px; color: #535353; margin: 10px 0;">CREDITS: Advait8370</p>
+                <button onclick="Sound.toggle()">SOUND: ON</button>
+                <p class="credits">CREDITS: Advait8370</p>
                 <button class="back" onclick="ui.show('main')">BACK</button>
             </div>
         </div>
 
-        <div id="menu-updates" class="overlay hidden">
-            <h2>LOGS</h2>
-            <div class="scroll-box">
-                <p><span>v26.3:</span> Online Multiplayer & Analytics.</p>
-                <p><span>v26.2:</span> Real Pixel Sprites & UI Fix.</p>
-            </div>
-            <button class="back" onclick="ui.show('main')">BACK</button>
-        </div>
-
         <div id="game-stats" class="hidden">
+            <div id="biome-tag">DESERT</div>
             <div id="score-box">HI <span id="hi-val">00000</span> | <span id="score-val">00000</span></div>
         </div>
 
@@ -81,7 +78,6 @@
             </div>
         </div>
     </div>
-
     <canvas id="c"></canvas>
 </div>
 

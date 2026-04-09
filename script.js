@@ -3,8 +3,23 @@ const ctx = canvas.getContext('2d');
 const W = 800, H = 200;
 canvas.width = W; canvas.height = H;
 
-// Socket Setup
 const socket = io("https://dino-run-remastered-server.onrender.com");
+
+// --- ASSET LOADER (Pointing to assets/ folder) ---
+const assets = {};
+const assetNames = [
+    'DinoStart', 'DinoRun1', 'DinoRun2', 'DinoJump', 'DinoDead', 
+    'DinoDuck1', 'DinoDuck2', 'Bird1', 'Bird2', 'Cloud',
+    'Track', 'GameOver', 
+    'SmallCactus1', 'SmallCactus2', 'SmallCactus3',
+    'LargeCactus1', 'LargeCactus2', 'LargeCactus3'
+];
+
+assetNames.forEach(name => {
+    assets[name] = new Image();
+    // Added the 'assets/' prefix to the source path
+    assets[name].src = `assets/${name}.png`; 
+});
 
 let state = {
     mode: 'menu',
@@ -12,184 +27,234 @@ let state = {
     hiScore: 0,
     speed: 6,
     frame: 0,
-    entities: []
+    entities: [],
+    clouds: [],
+    trackX: 0,
+    nickname: 'Dino',
+    biome: 'desert'
 };
 
-const SPRITES = {
-    dino: [[0,0,0,1,1,1,1,0],[0,0,0,1,1,0,1,1],[0,0,0,1,1,1,1,1],[1,1,1,1,1,1,0,0],[1,1,1,1,1,1,1,0],[0,0,1,1,1,1,1,0],[0,0,1,0,0,1,0,0]],
-    cactus: [[0,1,1,0],[1,1,1,1],[0,1,1,0],[0,1,1,0]]
+const Sound = {
+    ctx: null,
+    enabled: true,
+    init() { if(!this.ctx) this.ctx = new (window.AudioContext || window.webkitAudioContext)(); },
+    play(f, t, d, v = 0.05) {
+        this.init();
+        if(!this.enabled) return;
+        try {
+            const o = this.ctx.createOscillator();
+            const g = this.ctx.createGain();
+            o.type = t; o.frequency.setValueAtTime(f, this.ctx.currentTime);
+            g.gain.setValueAtTime(v, this.ctx.currentTime);
+            g.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + d);
+            o.connect(g); g.connect(this.ctx.destination);
+            o.start(); o.stop(this.ctx.currentTime + d);
+        } catch(e) {}
+    },
+    jump() { this.play(400, 'square', 0.1); },
+    die() { this.play(150, 'sawtooth', 0.3); },
+    point() { this.play(800, 'square', 0.1); },
+    toggle() { this.enabled = !this.enabled; }
 };
 
 class Entity {
-    constructor(x, y, w, h, type, color) {
-        Object.assign(this, {x, y, w, h, type, color, vy: 0, ground: true, duck: false});
+    constructor(x, y, w, h, type, subType = null) {
+        Object.assign(this, {x, y, w, h, type, subType, vy: 0, ground: true, duck: false});
     }
+
     draw() {
-        ctx.fillStyle = this.color;
-        const map = SPRITES[this.type] || [[1]];
-        const pSize = this.w / map[0].length;
-        map.forEach((row, rIdx) => {
-            row.forEach((pixel, cIdx) => {
-                if (pixel) ctx.fillRect(this.x + (cIdx * pSize), this.y + (rIdx * pSize), pSize, pSize);
-            });
-        });
+        let img;
+        const animFrame = Math.floor(state.frame / 10) % 2;
+
+        if (this.type === 'dino') {
+            if (state.mode === 'over') img = assets['DinoDead'];
+            else if (!this.ground) img = assets['DinoJump'];
+            else if (this.duck) img = (animFrame === 0) ? assets['DinoDuck1'] : assets['DinoDuck2'];
+            else img = (animFrame === 0) ? assets['DinoRun1'] : assets['DinoRun2'];
+        } 
+        else if (this.type === 'bird') {
+            img = (animFrame === 0) ? assets['Bird1'] : assets['Bird2'];
+        }
+        else if (this.type === 'cactus') {
+            img = assets[this.subType];
+        }
+
+        if (img && img.complete) {
+            ctx.drawImage(img, this.x, this.y, this.w, this.h);
+        }
     }
 }
 
-let player1 = null, player2 = null;
+let player1 = null;
 const online = { roomId: null, remotePlayers: {} };
 
 const ui = {
     show: (name) => {
         document.querySelectorAll('.overlay').forEach(el => el.classList.add('hidden'));
-        const target = document.getElementById(`menu-${name}`);
-        if(target) target.classList.remove('hidden');
+        document.getElementById(`menu-${name}`).classList.remove('hidden');
+        if(name === 'leaderboard') socket.emit('get-leaderboard');
     }
 };
 
 const game = {
     start: (mode) => {
-        // Analytics
-        if(typeof gtag === 'function') {
-            gtag('event', 'game_start', { 'game_mode': mode });
-        }
-
-        state.mode = mode;
-        state.score = 0;
-        state.speed = 6;
-        state.frame = 0;
-        state.entities = [];
-        online.remotePlayers = {};
-
-        player1 = new Entity(50, 150, 40, 44, 'dino', '#535353');
-        if (mode === 'local') {
-            player2 = new Entity(100, 150, 40, 44, 'dino', '#e05c2a');
-        } else {
-            player2 = null;
-        }
-
+        Sound.init();
+        state.nickname = document.getElementById('nick-input').value.trim() || "Dino";
+        state.mode = mode; state.score = 0; state.speed = 6; state.frame = 0; 
+        state.entities = []; state.clouds = []; state.trackX = 0;
+        state.biome = 'desert';
+        
+        document.getElementById('game-container').className = ''; 
+        document.getElementById('biome-tag').innerText = 'DESERT';
+        
+        player1 = new Entity(50, 150, 44, 47, 'dino');
+        
         document.getElementById('game-over').classList.add('hidden');
         document.getElementById('game-stats').classList.remove('hidden');
         document.querySelectorAll('.overlay').forEach(el => el.classList.add('hidden'));
+        
+        if(typeof gtag === 'function') gtag('event', 'game_start', { 'game_mode': mode });
     },
-    restart: () => {
-        game.start(state.mode);
-    }
+    restart: () => game.start(state.mode)
 };
 
 const keys = {};
-window.onkeydown = (e) => {
-    keys[e.code] = true;
-    if (state.mode === 'menu' || state.mode === 'over') return;
-    if ((e.code === 'Space' || e.code === 'ArrowUp') && player1) jump(player1);
-    if (e.code === 'KeyW' && player2) jump(player2);
+window.onkeydown = (e) => { 
+    keys[e.code] = true; 
+    if (state.mode !== 'menu' && state.mode !== 'over') { 
+        if (e.code === 'Space' || e.code === 'ArrowUp') jump(player1); 
+    } 
 };
 window.onkeyup = (e) => keys[e.code] = false;
 
-window.addEventListener('touchstart', (e) => {
-    if(state.mode !== 'menu' && state.mode !== 'over') {
-        if(e.target.tagName !== 'BUTTON' && e.target.tagName !== 'INPUT') jump(player1);
-    }
+window.addEventListener('touchstart', (e) => { 
+    if(state.mode !== 'menu' && state.mode !== 'over' && e.target.tagName !== 'BUTTON') jump(player1); 
 });
 
-function jump(p) { if (p && p.ground) { p.vy = -12; p.ground = false; } }
+function jump(p) { if (p && p.ground) { p.vy = -12; p.ground = false; Sound.jump(); } }
 
 function update() {
     if (state.mode === 'menu' || state.mode === 'over') return;
     
-    state.frame++;
-    state.score += 0.1;
+    state.frame++; state.score += 0.1;
+    const s = Math.floor(state.score);
+    
+    if (s === 500 && state.biome === 'desert') applyBiome('jungle');
+    if (s === 1000 && state.biome === 'jungle') applyBiome('city');
+    if (s === 1500 && state.biome === 'city') applyBiome('night');
+
     state.speed = Math.min(14, 6 + (state.score / 500));
 
     if(player1) {
         player1.duck = keys['ArrowDown'] || keys['KeyS'];
-        player1.vy += 0.6;
-        player1.y += player1.vy;
+        player1.vy += 0.6; player1.y += player1.vy;
         if (player1.y > 150) { player1.y = 150; player1.ground = true; }
-        
-        if(state.mode === 'online' && online.roomId) {
-            socket.emit('sync', { roomId: online.roomId, x: player1.x, y: player1.y, duck: player1.duck });
-        }
+        if(state.mode === 'online' && online.roomId) socket.emit('sync', { roomId: online.roomId, x: player1.x, y: player1.y, duck: player1.duck });
     }
 
-    if(player2) {
-        player2.vy += 0.6;
-        player2.y += player2.vy;
-        if (player2.y > 150) { player2.y = 150; player2.ground = true; }
+    if (state.frame % 120 === 0) {
+        state.clouds.push({ x: W, y: Math.random() * 60 + 20, speed: state.speed * 0.3 });
     }
 
     if (state.frame % 80 === 0) {
-        state.entities.push(new Entity(W, 160, 25, 35, 'cactus', '#535353'));
+        const type = Math.random() > 0.8 && state.score > 200 ? 'bird' : 'cactus';
+        if (type === 'bird') {
+            state.entities.push(new Entity(W, 100, 42, 30, 'bird'));
+        } else {
+            const types = ['SmallCactus1', 'SmallCactus2', 'SmallCactus3', 'LargeCactus1', 'LargeCactus2', 'LargeCactus3'];
+            const sub = types[Math.floor(Math.random() * types.length)];
+            const h = sub.includes('Large') ? 50 : 35;
+            const w = sub.includes('3') ? 45 : (sub.includes('2') ? 32 : 17);
+            state.entities.push(new Entity(W, 195 - h, w, h, 'cactus', sub));
+        }
     }
 
-    state.entities.forEach((ent) => {
+    state.entities.forEach(ent => {
         ent.x -= state.speed;
-        if (player1 && checkHit(player1, ent)) gameOver(state.mode === 'local' ? "PLAYER 2 WINS!" : "GAME OVER");
-        if (player2 && checkHit(player2, ent)) gameOver("PLAYER 1 WINS!");
+        if (player1 && checkHit(player1, ent)) gameOver();
     });
 
+    state.clouds.forEach(c => c.x -= c.speed);
     state.entities = state.entities.filter(ent => ent.x + ent.w > 0);
-    document.getElementById('score-val').innerText = Math.floor(state.score).toString().padStart(5, '0');
+    state.clouds = state.clouds.filter(c => c.x + 50 > 0);
+    
+    document.getElementById('score-val').innerText = s.toString().padStart(5, '0');
+}
+
+function applyBiome(b) {
+    state.biome = b;
+    document.getElementById('game-container').className = b;
+    document.getElementById('biome-tag').innerText = b.toUpperCase();
+    Sound.point();
 }
 
 function checkHit(p, e) {
-    const pY = p.duck ? p.y + 22 : p.y;
+    const pY = p.duck ? p.y + 25 : p.y;
     const pH = p.duck ? 22 : p.h;
     return p.x < e.x + e.w && p.x + p.w > e.x && pY < e.y + e.h && pY + pH > e.y;
 }
 
-function gameOver(msg) {
-    // Analytics
-    if(typeof gtag === 'function') {
-        gtag('event', 'game_over', { 'score': Math.floor(state.score), 'game_mode': state.mode });
-    }
-
+function gameOver() {
+    Sound.die();
+    socket.emit('submit-score', { name: state.nickname, score: Math.floor(state.score) });
     state.mode = 'over';
     document.getElementById('game-over').classList.remove('hidden');
-    document.getElementById('winner-text').innerText = msg;
+    if(typeof gtag === 'function') gtag('event', 'game_over', { 'score': Math.floor(state.score) });
 }
 
 function loop() {
     ctx.clearRect(0, 0, W, H);
-    ctx.fillStyle = '#535353';
-    ctx.fillRect(0, 190, W, 2); 
+    
+    if (state.mode !== 'menu') {
+        state.trackX -= state.speed;
+        if (state.trackX <= -W) state.trackX = 0;
+        if (assets['Track'].complete) {
+            ctx.drawImage(assets['Track'], state.trackX, 185, W, 12);
+            ctx.drawImage(assets['Track'], state.trackX + W, 185, W, 12);
+        }
+    }
+
+    state.clouds.forEach(c => {
+        if (assets['Cloud'].complete) ctx.drawImage(assets['Cloud'], c.x, c.y, 46, 14);
+    });
 
     if (state.mode !== 'menu') {
         update();
         if(player1) player1.draw();
-        if(player2) player2.draw();
-        Object.values(online.remotePlayers).forEach(p => { if(p.draw) p.draw(); });
+        
+        Object.values(online.remotePlayers).forEach(p => { 
+            const anim = Math.floor(state.frame / 10) % 2;
+            const img = (anim === 0) ? assets['DinoRun1'] : assets['DinoRun2'];
+            if (img.complete) {
+                ctx.globalAlpha = 0.5;
+                ctx.drawImage(img, p.x, p.y, 44, 47);
+                ctx.globalAlpha = 1.0;
+            }
+        });
+        
         state.entities.forEach(e => e.draw());
+
+        if (state.mode === 'over' && assets['GameOver'].complete) {
+            ctx.drawImage(assets['GameOver'], W/2 - 95, H/2 - 20, 190, 11);
+        }
     }
     requestAnimationFrame(loop);
 }
 
-socket.on('joined', (data) => {
-    online.roomId = data.roomId;
-    game.start('online');
+socket.on('update-leaderboard', (data) => {
+    const list = document.getElementById('leaderboard-list');
+    list.innerHTML = data.map((s, i) => `<div>${i+1}. ${s.name.toUpperCase()} - ${s.score}</div>`).join('');
 });
 
+socket.on('joined', (data) => { online.roomId = data.roomId; game.start('online'); });
+
 socket.on('player-moved', (data) => {
-    if(!online.remotePlayers[data.id]) {
-        online.remotePlayers[data.id] = new Entity(data.x, data.y, 40, 44, 'dino', '#aaaaaa');
-    }
-    online.remotePlayers[data.id].x = data.x;
-    online.remotePlayers[data.id].y = data.y;
-    online.remotePlayers[data.id].duck = data.duck;
+    online.remotePlayers[data.id] = { x: data.x, y: data.y, duck: data.duck };
 });
 
 const onlineLobby = {
-    create: () => {
-        const m = document.getElementById('max-p').value;
-        socket.emit('create-room', { max: parseInt(m) });
-    },
-    join: () => {
-        const id = document.getElementById('room-input').value;
-        if(id) socket.emit('join-room', id);
-    }
+    create: () => socket.emit('create-room', { max: parseInt(document.getElementById('max-p').value) }),
+    join: () => { const id = document.getElementById('room-input').value; if(id) socket.emit('join-room', id); }
 };
-// Attach to window so HTML can find them
 window.online = onlineLobby;
-
-window.addEventListener('resize', () => { canvas.width = 800; canvas.height = 200; });
 loop();

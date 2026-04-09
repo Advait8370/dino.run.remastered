@@ -6,15 +6,7 @@
     --accent: #e05c2a;
 }
 
-/* 1. RESET & MOBILE OPTIMIZATION */
-* { 
-    box-sizing: border-box; 
-    margin: 0; 
-    padding: 0; 
-    touch-action: none; 
-    user-select: none;
-    -webkit-tap-highlight-color: transparent;
-}
+* { box-sizing: border-box; margin: 0; padding: 0; touch-action: none; user-select: none; }
 
 body {
     background: #1a1a1a;
@@ -22,40 +14,35 @@ body {
     align-items: center;
     justify-content: center;
     height: 100vh;
-    width: 100vw;
     font-family: 'Press Start 2P', cursive;
     overflow: hidden;
-    margin: 0;
 }
 
-/* 2. GAME CONTAINER */
 #game-container {
     position: relative;
     width: 95vw;
     max-width: 800px;
-    /* Maintains the shape of the game world */
-    aspect-ratio: 4 / 1; 
+    min-height: 200px; 
     background: var(--bg);
     border: 4px solid var(--dino);
     image-rendering: pixelated;
+    transition: background 1s, border-color 1s;
+    display: flex;
+    flex-direction: column;
     overflow: hidden;
 }
 
-canvas {
-    width: 100%;
-    height: 100%;
-    display: block;
-}
+#game-container.jungle { background: #aed581; --dino: #2e7d32; }
+#game-container.city { background: #cfd8dc; --dino: #37474f; }
+#game-container.night { background: #263238; border-color: #eceff1; }
+#game-container.night h1, #game-container.night h2, #game-container.night #score-box { color: #eceff1; }
 
-/* 3. MENU OVERLAYS */
+canvas { width: 100%; height: 200px; display: block; }
+
 .overlay {
     position: absolute;
-    /* This forces the menu background to fill the container */
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: var(--bg);
+    inset: 0;
+    background: inherit;
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -64,29 +51,29 @@ canvas {
     padding: 15px;
 }
 
+#menu-main {
+    position: relative;
+    padding: 30px 10px;
+}
+
+#nick-input, #room-input {
+    background: #fff;
+    border: 2px solid var(--dino);
+    padding: 8px;
+    font-family: 'Press Start 2P';
+    font-size: 8px;
+    margin-bottom: 15px;
+    outline: none;
+    width: 220px;
+    text-align: center;
+}
+
 .hidden { display: none !important; }
 
-/* 4. TYPOGRAPHY & BUTTONS */
-h1 { 
-    font-size: clamp(10px, 4vw, 16px); 
-    margin-bottom: 20px; 
-    color: var(--dino); 
-    text-align: center; 
-}
+h1 { font-size: 14px; margin-bottom: 15px; color: var(--dino); text-align: center; }
+h2 { font-size: 10px; margin-bottom: 10px; color: var(--accent); }
 
-h2 { 
-    font-size: 10px; 
-    margin-bottom: 15px; 
-    color: var(--accent); 
-}
-
-.btn-group { 
-    display: flex; 
-    flex-direction: column; 
-    gap: 8px; 
-    width: 240px; 
-    max-width: 90%; 
-}
+.btn-group { display: flex; flex-direction: column; gap: 8px; width: 220px; }
 
 button {
     background: var(--dino);
@@ -96,54 +83,29 @@ button {
     font-family: 'Press Start 2P';
     font-size: 8px;
     cursor: pointer;
-    width: 100%;
 }
 
 button:active { transform: scale(0.96); }
-button:hover { background: var(--accent); }
-button.back { background: #888; margin-top: 5px; }
-button.disabled { opacity: 0.5; cursor: not-allowed; }
 
-/* 5. HUD ELEMENTS */
 #game-stats {
     position: absolute;
-    top: 8px;
-    right: 12px;
+    top: 8px; right: 12px;
     font-size: 8px;
     color: var(--dino);
     z-index: 10;
 }
 
+#biome-tag { font-size: 6px; margin-bottom: 4px; color: var(--accent); text-align: right; }
+
 .scroll-box {
     font-size: 7px;
-    line-height: 1.6;
-    max-height: 60px;
+    line-height: 2;
+    max-height: 100px;
     overflow-y: auto;
-    text-align: left;
-    margin-bottom: 10px;
     width: 100%;
+    text-align: center;
 }
 
-/* 6. RESPONSIVE ORIENTATION FIXES */
-
-/* Vertical Mobile (Portrait) */
 @media (orientation: portrait) {
-    #game-container {
-        width: 98vw;
-        /* Make the box taller so menus aren't squashed */
-        aspect-ratio: 2 / 1; 
-        border-width: 3px;
-    }
-    h1 { margin-bottom: 15px; }
-    button { padding: 14px; font-size: 8px; }
-    .btn-group { width: 100%; }
-}
-
-/* Short Mobile (Landscape) */
-@media (orientation: landscape) and (max-height: 450px) {
-    #game-container {
-        max-height: 70vh;
-    }
-    h1 { margin-bottom: 10px; font-size: 12px; }
-    button { padding: 8px; }
+    #game-container { min-height: 250px; }
 }
