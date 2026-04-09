@@ -266,23 +266,21 @@ socket.on('player-moved', (data) => {
 
 // --- THE CRITICAL BRIDGE FIX ---
 // We define the object and then attach it to 'window' so index.html can find it.
+// At the very end of your script.js file
 const onlineLobby = {
     create: () => {
-        if (!socket.connected) return alert("Connecting to server...");
         const nick = document.getElementById('nick-input').value.trim() || "Dino";
         const max = parseInt(document.getElementById('max-p').value);
         socket.emit('create-room', { max: max, nickname: nick });
     },
     join: () => {
-        if (!socket.connected) return alert("Connecting to server...");
         const nick = document.getElementById('nick-input').value.trim() || "Dino";
         const id = document.getElementById('room-input').value.trim();
         if(id) socket.emit('join-room', { roomId: id, nickname: nick });
     }
 };
 
-// This explicitly attaches your lobby logic to the 'online' keyword used in HTML
+// THIS IS THE FIX: It creates a global "bridge" for the HTML
 window.online = onlineLobby; 
 
-// Ensure the game loop starts after the bridge is built
 loop();
