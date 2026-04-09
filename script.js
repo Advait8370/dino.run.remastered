@@ -281,7 +281,8 @@ const onlineLobby = {
     }
 };
 
-// Global attachment - this resolves "online.join is not a function"
+// This explicitly attaches your lobby logic to the 'online' keyword used in HTML
 window.online = onlineLobby; 
 
+// Ensure the game loop starts after the bridge is built
 loop();
