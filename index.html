@@ -50,9 +50,20 @@
                 <input type="text" id="room-input" placeholder="ENTER ROOM ID">
                 <button onclick="online.join()">JOIN ROOM</button>
                 <hr>
-                <label>MAX PLAYERS: <input type="number" id="max-p" value="5" min="2" max="10"></label>
+                <label style="font-size: 8px;">MAX PLAYERS: 
+                    <input type="number" id="max-p" value="5" min="2" max="10" style="width: 40px;">
+                </label>
                 <button onclick="online.create()">CREATE ROOM</button>
                 <button class="back" onclick="ui.show('multi')">BACK</button>
+            </div>
+        </div>
+
+        <div id="menu-lobby" class="overlay hidden">
+            <h2>LOBBY: <span id="display-room-id" style="color: var(--accent);">...</span></h2>
+            <div id="player-list" class="scroll-box" style="margin: 10px 0;">Waiting for players...</div>
+            <div class="btn-group">
+                <button id="admin-start-btn" class="hidden" style="background: #2e7d32;" onclick="online.adminStart()">START GAME</button>
+                <button class="back" onclick="location.reload()">LEAVE</button>
             </div>
         </div>
 
@@ -82,6 +93,7 @@
 </div>
 
 <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
-<script src="client.js"></script> <script src="script.js"></script>
+<script src="client.js"></script> 
+<script src="script.js"></script>
 </body>
 </html>
