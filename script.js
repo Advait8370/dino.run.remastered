@@ -3,7 +3,7 @@ const ctx = canvas.getContext('2d');
 const W = 800, H = 200;
 canvas.width = W; canvas.height = H;
 
-// Using HTTPS to ensure secure connection with Render backend
+// Secure HTTPS connection to your Render backend
 const socket = io("https://dino-run-remastered-server.onrender.com");
 
 // --- ASSET LOADER ---
@@ -16,9 +16,9 @@ const assetNames = [
     'LargeCactus1', 'LargeCactus2', 'LargeCactus3'
 ];
 
+// Load all images from the assets/ folder
 assetNames.forEach(name => {
     assets[name] = new Image();
-    // Correctly prefixing path with assets/ folder
     assets[name].src = `assets/${name}.png`; 
 });
 
@@ -139,6 +139,7 @@ function update() {
     state.frame++; state.score += 0.1;
     const s = Math.floor(state.score);
     
+    // Biome Logic
     if (s === 500 && state.biome === 'desert') applyBiome('jungle');
     if (s === 1000 && state.biome === 'jungle') applyBiome('city');
     if (s === 1500 && state.biome === 'city') applyBiome('night');
@@ -150,6 +151,7 @@ function update() {
         player1.vy += 0.6; player1.y += player1.vy;
         if (player1.y > 150) { player1.y = 150; player1.ground = true; }
         
+        // Multiplayer Sync
         if(state.mode === 'online' && online.roomId) {
             socket.emit('sync', { 
                 roomId: online.roomId, 
@@ -230,6 +232,7 @@ function loop() {
         update();
         if(player1) player1.draw();
         
+        // Remote Players
         Object.values(online.remotePlayers).forEach(p => { 
             const anim = Math.floor(state.frame / 10) % 2;
             const img = (anim === 0) ? assets['DinoRun1'] : assets['DinoRun2'];
@@ -265,7 +268,7 @@ socket.on('player-moved', (data) => {
 });
 
 // --- BRIDGE TO HTML BUTTONS ---
-// Fixed TypeError by assigning directly to window
+// Fixes "TypeError: online.join is not a function"
 const onlineLobby = {
     create: () => {
         const nick = document.getElementById('nick-input').value.trim() || "Dino";
@@ -275,6 +278,7 @@ const onlineLobby = {
     join: () => {
         const nick = document.getElementById('nick-input').value.trim() || "Dino";
         const id = document.getElementById('room-input').value.trim();
+        // Corrected to send an object to match server.js
         if(id) socket.emit('join-room', { roomId: id, nickname: nick });
     }
 };
