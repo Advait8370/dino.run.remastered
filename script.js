@@ -1,4 +1,4 @@
-/** script.js - Core Game Engine */
+/** script.js - Core Game Engine with Fixed Animations */
 const canvas = document.getElementById('c');
 const ctx = canvas.getContext('2d');
 const W = 800, H = 200;
@@ -27,7 +27,6 @@ const keys = {};
 
 window.onkeydown = (e) => { 
     keys[e.code] = true; 
-    // Trigger jump on Space or Arrow Up if the game is active
     if (state.mode !== 'menu' && state.mode !== 'over') { 
         if (e.code === 'Space' || e.code === 'ArrowUp') jump(player1); 
     } 
@@ -37,9 +36,7 @@ window.onkeyup = (e) => {
     keys[e.code] = false;
 };
 
-// Handle touch for mobile devices
 window.addEventListener('touchstart', (e) => { 
-    // Ignore touches on buttons to allow UI interaction
     if(state.mode !== 'menu' && state.mode !== 'over' && e.target.tagName !== 'BUTTON') {
         jump(player1); 
     }
@@ -47,8 +44,8 @@ window.addEventListener('touchstart', (e) => {
 
 function jump(p) { 
     if (p && p.ground) { 
-        p.vy = -12; // Upward velocity
-        p.ground = false; 
+        p.vy = -12; 
+        p.ground = false; // Transition to jumping state
     } 
 }
 
@@ -56,9 +53,28 @@ class Entity {
     constructor(x, y, w, h, type, subType) { 
         Object.assign(this, {x, y, w, h, type, subType, vy: 0, ground: true, duck: false}); 
     }
+    
     draw() {
-        let img = assets[this.subType] || assets['DinoRun1'];
-        if (img.complete) ctx.drawImage(img, this.x, this.y, this.w, this.h);
+        let img;
+        // Calculate animation frame (cycles 0 and 1 every 10 frames)
+        const animFrame = Math.floor(state.frame / 10) % 2;
+
+        if (this.type === 'dino') {
+            if (state.mode === 'over') {
+                img = assets['DinoDead'];
+            } else if (!this.ground) {
+                img = assets['DinoJump']; // Use jump sprite when in air
+            } else {
+                // Toggle between Run1 and Run2 when on the ground
+                img = (animFrame === 0) ? assets['DinoRun1'] : assets['DinoRun2'];
+            }
+        } else {
+            img = assets[this.subType];
+        }
+
+        if (img && img.complete) {
+            ctx.drawImage(img, this.x, this.y, this.w, this.h);
+        }
     }
 }
 
@@ -79,8 +95,6 @@ const game = {
         player1 = new Entity(50, 150, 44, 47, 'dino', 'DinoRun1');
         document.getElementById('game-stats').classList.remove('hidden');
         document.querySelectorAll('.overlay').forEach(el => el.classList.add('hidden'));
-        
-        // Update high score display
         document.getElementById('hi-val').innerText = state.hiScore.toString().padStart(5, '0');
     },
     restart: () => game.start(state.mode)
@@ -89,23 +103,22 @@ const game = {
 function update() {
     if (state.mode === 'menu' || state.mode === 'over') return;
     
-    state.frame++; 
+    state.frame++; // CRITICAL: Increment frame to drive animations
     state.score += 0.1;
     state.speed = Math.min(14, 6 + (state.score / 500));
 
     if(player1) {
-        // Handle ducking state based on keys
         player1.duck = keys['ArrowDown'] || keys['KeyS'];
-        
         player1.vy += 0.6; // Gravity
         player1.y += player1.vy;
         
+        // Ground collision check
         if (player1.y > 150) { 
             player1.y = 150; 
             player1.ground = true; 
+            player1.vy = 0;
         }
         
-        // Sync with multiplayer server
         if(state.mode === 'online') {
             client.sendSync(state.nickname, player1.x, player1.y, player1.duck);
         }
@@ -117,7 +130,6 @@ function update() {
 
     state.entities.forEach(ent => {
         ent.x -= state.speed;
-        // Basic collision detection
         if (player1 && player1.x < ent.x + ent.w && player1.x + player1.w > ent.x && 
             player1.y < ent.y + ent.h && player1.y + player1.h > ent.y) {
             gameOver();
@@ -129,12 +141,9 @@ function update() {
 
 function gameOver() {
     state.mode = 'over';
-    // Call networking logic if available
     if (window.client && window.client.submitScore) {
         window.client.submitScore(state.nickname, Math.floor(state.score));
     }
-    
-    // Local High Score
     if (Math.floor(state.score) > state.hiScore) {
         state.hiScore = Math.floor(state.score);
         localStorage.setItem('dinoHiScore', state.hiScore);
@@ -146,12 +155,18 @@ function loop() {
     ctx.clearRect(0, 0, W, H);
     update();
     
+    // Draw the track
+    if (assets['Track'].complete) {
+        ctx.drawImage(assets['Track'], 0, 180, W, 20);
+    }
+
     if (player1) player1.draw();
     
-    // Draw remote players
     Object.values(client.remotePlayers).forEach(p => {
         ctx.globalAlpha = 0.5;
-        if (assets['DinoRun1'].complete) ctx.drawImage(assets['DinoRun1'], p.x, p.y, 44, 47);
+        const anim = Math.floor(state.frame / 10) % 2;
+        const img = (anim === 0) ? assets['DinoRun1'] : assets['DinoRun2'];
+        if (img && img.complete) ctx.drawImage(img, p.x, p.y, 44, 47);
         ctx.globalAlpha = 1.0;
     });
 
@@ -159,7 +174,6 @@ function loop() {
     requestAnimationFrame(loop);
 }
 
-// Global Bridge
 window.ui = ui; 
 window.game = game;
 loop();
