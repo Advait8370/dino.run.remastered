@@ -8,10 +8,11 @@
       gtag('js', new Date());
       gtag('config', 'G-QVKVE9QYBY');
     </script>
+    
     <link rel="icon" href="assets/DinoStart.png">
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-    <title>Dino Run Remastered</title>
+    <title>Dino Run Remastered🦕</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -59,8 +60,19 @@
         </div>
 
         <div id="menu-lobby" class="overlay hidden">
-            <h2>LOBBY: <span id="display-room-id" style="color: var(--accent);">...</span></h2>
-            <div id="player-list" class="scroll-box" style="margin: 10px 0;">Waiting for players...</div>
+            <h2>LOBBY</h2>
+            
+            <div style="margin-bottom: 10px; font-size: 10px;">
+                ID: <span id="display-room-id" style="color: #e05c2a; cursor: pointer; text-decoration: underline;" onclick="copyRoomID()">...</span>
+                <div style="font-size: 6px; margin-top: 4px;">(CLICK TO COPY)</div>
+            </div>
+
+            <div id="player-count" style="font-size: 8px; margin: 10px 0;">PLAYERS: 0</div>
+            
+            <div id="player-list" class="scroll-box" style="border: 2px solid #535353; padding: 10px;">
+                Waiting for players...
+            </div>
+
             <div class="btn-group">
                 <button id="admin-start-btn" class="hidden" style="background: #2e7d32;" onclick="online.adminStart()">START GAME</button>
                 <button class="back" onclick="location.reload()">LEAVE</button>
