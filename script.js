@@ -253,35 +253,68 @@ function loop() {
 }
 
 // --- MULTIPLAYER CORE ---
+
+// Log connection status for debugging
+socket.on('connect', () => {
+    console.log("Connected to Render Server: " + socket.id);
+});
+
+socket.on('connect_error', (err) => {
+    console.error("Connection Error: Server might be waking up. Please wait...");
+});
+
 socket.on('update-leaderboard', (data) => {
     const list = document.getElementById('leaderboard-list');
     if (list) list.innerHTML = data.map((s, i) => `<div>${i+1}. ${s.name.toUpperCase()} - ${s.score}</div>`).join('');
 });
 
 socket.on('joined', (data) => { 
+    console.log("Joined room: " + data.roomId);
     online.roomId = data.roomId; 
     game.start('online'); 
+});
+
+// Listener for room errors (Room full, not found, etc.)
+socket.on('error-msg', (msg) => {
+    alert(msg);
 });
 
 socket.on('player-moved', (data) => {
     online.remotePlayers[data.id] = { x: data.x, y: data.y, duck: data.duck, nickname: data.nickname };
 });
 
+// Listener for when a player leaves the room
+socket.on('player-left', (id) => {
+    delete online.remotePlayers[id];
+});
+
 // --- BRIDGE TO HTML BUTTONS ---
-// Fixes "TypeError: online.join is not a function"
 const onlineLobby = {
     create: () => {
+        if(!socket.connected) {
+            alert("Still connecting to server... please wait 30 seconds and try again.");
+            return;
+        }
         const nick = document.getElementById('nick-input').value.trim() || "Dino";
         const max = parseInt(document.getElementById('max-p').value);
+        console.log("Creating room as: " + nick);
         socket.emit('create-room', { max: max, nickname: nick });
     },
     join: () => {
+        if(!socket.connected) {
+            alert("Still connecting to server...");
+            return;
+        }
         const nick = document.getElementById('nick-input').value.trim() || "Dino";
         const id = document.getElementById('room-input').value.trim();
-        // Corrected to send an object to match server.js
-        if(id) socket.emit('join-room', { roomId: id, nickname: nick });
+        if(id) {
+            console.log("Joining room: " + id);
+            socket.emit('join-room', { roomId: id, nickname: nick });
+        } else {
+            alert("Please enter a Room ID");
+        }
     }
 };
 
-window.online = onlineLobby; // Critical link for onclick="online.join()"
+window.online = onlineLobby; 
 loop();
