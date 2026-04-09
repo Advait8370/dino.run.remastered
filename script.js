@@ -1,14 +1,13 @@
 const canvas = document.getElementById('c');
 const ctx = canvas.getContext('2d');
-
-// Internal resolution stays 800x200 for physics consistency
 const W = 800, H = 200;
 canvas.width = W; canvas.height = H;
 
-// Socket connection to your Render server
+// 1. Socket Setup
 const socket = io("https://dino-run-remastered-server.onrender.com");
 
-const state = {
+// 2. Initial State
+let state = {
     mode: 'menu',
     score: 0,
     hiScore: 0,
@@ -38,74 +37,49 @@ class Entity {
     }
 }
 
-let player1, player2;
-const online = {
-    roomId: null,
-    remotePlayers: {},
-    create: () => {
-        const max = document.getElementById('max-p').value;
-        socket.emit('create-room', { max: parseInt(max) });
-    },
-    join: () => {
-        const id = document.getElementById('room-input').value;
-        if(id) socket.emit('join-room', id);
-    }
-};
+let player1 = null, player2 = null;
+const online = { roomId: null, remotePlayers: {} };
 
-// Multiplayer Sync
-socket.on('joined', (data) => {
-    online.roomId = data.roomId;
-    game.start('online');
-    alert("ROOM ID: " + data.roomId);
-});
-
-socket.on('player-moved', (data) => {
-    if(!online.remotePlayers[data.id]) {
-        online.remotePlayers[data.id] = new Entity(data.x, data.y, 40, 44, 'dino', '#aaaaaa');
-    }
-    online.remotePlayers[data.id].x = data.x;
-    online.remotePlayers[data.id].y = data.y;
-    online.remotePlayers[data.id].duck = data.duck;
-});
-
+// 3. UI and Game Control
 const ui = {
     show: (name) => {
         document.querySelectorAll('.overlay').forEach(el => el.classList.add('hidden'));
-        document.getElementById(`menu-${name}`).classList.remove('hidden');
+        const target = document.getElementById(`menu-${name}`);
+        if(target) target.classList.remove('hidden');
     }
 };
 
 const game = {
     start: (mode) => {
-        // --- CRITICAL RESET LOGIC ---
+        console.log("Initializing Game Mode:", mode);
+        
+        // Full Reset
         state.mode = mode;
         state.score = 0;
         state.speed = 6;
-        state.frame = 0; // Fix: Reset frame count for obstacle timing
-        state.entities = []; // Fix: Clear old obstacles so you don't die instantly
-        
+        state.frame = 0;
+        state.entities = [];
+        online.remotePlayers = {};
+
+        // Re-instantiate Players
         player1 = new Entity(50, 150, 40, 44, 'dino', '#535353');
-        player1.vy = 0; // Fix: Reset jump velocity
-        
         if (mode === 'local') {
             player2 = new Entity(100, 150, 40, 44, 'dino', '#e05c2a');
-            player2.vy = 0;
         } else {
             player2 = null;
         }
-        
-        online.remotePlayers = {}; // Clear other players
-        
-        document.querySelectorAll('.overlay').forEach(el => el.classList.add('hidden'));
+
+        // UI Reset
+        document.getElementById('game-over').classList.add('hidden');
         document.getElementById('game-stats').classList.remove('hidden');
-        document.getElementById('game-over').classList.add('hidden'); // Ensure game over UI is gone
+        document.querySelectorAll('.overlay').forEach(el => el.classList.add('hidden'));
     },
     restart: () => {
         game.start(state.mode);
     }
 };
 
-// Controls
+// 4. Input Handling
 const keys = {};
 window.onkeydown = (e) => {
     keys[e.code] = true;
@@ -115,17 +89,15 @@ window.onkeydown = (e) => {
 };
 window.onkeyup = (e) => keys[e.code] = false;
 
-// Mobile Touch Jump
 window.addEventListener('touchstart', (e) => {
     if(state.mode !== 'menu' && state.mode !== 'over') {
-        if(e.target.tagName !== 'BUTTON' && e.target.tagName !== 'INPUT') {
-            jump(player1);
-        }
+        if(e.target.tagName !== 'BUTTON' && e.target.tagName !== 'INPUT') jump(player1);
     }
-}, { passive: false });
+});
 
 function jump(p) { if (p && p.ground) { p.vy = -12; p.ground = false; } }
 
+// 5. Physics and Logic
 function update() {
     if (state.mode === 'menu' || state.mode === 'over') return;
     
@@ -150,67 +122,62 @@ function update() {
         if (player2.y > 150) { player2.y = 150; player2.ground = true; }
     }
 
-    // Spawn Obstacles
     if (state.frame % 80 === 0) {
         state.entities.push(new Entity(W, 160, 25, 35, 'cactus', '#535353'));
     }
 
-    state.entities.forEach(ent => {
+    state.entities.forEach((ent, index) => {
         ent.x -= state.speed;
-        // Collision checks
         if (player1 && checkHit(player1, ent)) gameOver(state.mode === 'local' ? "PLAYER 2 WINS!" : "GAME OVER");
         if (player2 && checkHit(player2, ent)) gameOver("PLAYER 1 WINS!");
     });
 
-    // Cleanup off-screen entities
     state.entities = state.entities.filter(ent => ent.x + ent.w > 0);
-
     document.getElementById('score-val').innerText = Math.floor(state.score).toString().padStart(5, '0');
 }
 
 function checkHit(p, e) {
-    const pDucking = p.duck;
-    const pHeight = pDucking ? p.h / 2 : p.h;
-    const pY = pDucking ? p.y + (p.h / 2) : p.y;
-    
-    return p.x < e.x + e.w && 
-           p.x + p.w > e.x && 
-           pY < e.y + e.h && 
-           pY + pHeight > e.y;
+    const pY = p.duck ? p.y + 22 : p.y;
+    const pH = p.duck ? 22 : p.h;
+    return p.x < e.x + e.w && p.x + p.w > e.x && pY < e.y + e.h && pY + pH > e.y;
 }
 
 function gameOver(msg) {
     state.mode = 'over';
     document.getElementById('game-over').classList.remove('hidden');
     document.getElementById('winner-text').innerText = msg;
-    
-    // Save high score
-    if (state.score > state.hiScore) {
-        state.hiScore = state.score;
-        document.getElementById('hi-val').innerText = Math.floor(state.hiScore).toString().padStart(5, '0');
-    }
 }
 
-// Orientation Change Fix
-window.addEventListener('resize', () => {
-    canvas.width = 800;
-    canvas.height = 200;
-});
-
+// 6. Main Loop
 function loop() {
     ctx.clearRect(0, 0, W, H);
-    
-    // Draw Ground
     ctx.fillStyle = '#535353';
-    ctx.fillRect(0, 190, W, 2);
-    
+    ctx.fillRect(0, 190, W, 2); // Ground Line
+
     if (state.mode !== 'menu') {
         update();
         if(player1) player1.draw();
         if(player2) player2.draw();
-        Object.values(online.remotePlayers).forEach(p => p.draw());
+        Object.values(online.remotePlayers).forEach(p => { if(p.draw) p.draw(); });
         state.entities.forEach(e => e.draw());
     }
     requestAnimationFrame(loop);
 }
+
+// Socket Listeners
+socket.on('joined', (data) => {
+    online.roomId = data.roomId;
+    game.start('online');
+});
+
+socket.on('player-moved', (data) => {
+    if(!online.remotePlayers[data.id]) {
+        online.remotePlayers[data.id] = new Entity(data.x, data.y, 40, 44, 'dino', '#aaaaaa');
+    }
+    online.remotePlayers[data.id].x = data.x;
+    online.remotePlayers[data.id].y = data.y;
+    online.remotePlayers[data.id].duck = data.duck;
+});
+
+window.addEventListener('resize', () => { canvas.width = 800; canvas.height = 200; });
 loop();
